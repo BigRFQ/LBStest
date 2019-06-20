@@ -16,7 +16,12 @@ import com.baidu.location.BDLocationListener;
 import com.baidu.location.LocationClient;
 import com.baidu.location.LocationClientOption;
 import com.baidu.mapapi.SDKInitializer;
+import com.baidu.mapapi.map.BaiduMap;
+import com.baidu.mapapi.map.MapStatusUpdate;
+import com.baidu.mapapi.map.MapStatusUpdateFactory;
 import com.baidu.mapapi.map.MapView;
+import com.baidu.mapapi.map.MyLocationData;
+import com.baidu.mapapi.model.LatLng;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +31,8 @@ public class MainActivity extends AppCompatActivity {
     public LocationClient mLocationClient;
     private TextView positionText;
     private MapView mapView;
+    private BaiduMap baiduMap;
+    private  boolean isFirstLocation=true;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -35,6 +42,8 @@ public class MainActivity extends AppCompatActivity {
         SDKInitializer.initialize(getApplicationContext());
         setContentView(R.layout.activity_main);
         mapView = findViewById(R.id.bmapView);
+        baiduMap= mapView.getMap();
+        baiduMap.setMyLocationEnabled(true);
 
         positionText  = findViewById(R.id.position_text_view);
         List<String> permissionList =  new ArrayList<>();
@@ -56,6 +65,22 @@ public class MainActivity extends AppCompatActivity {
 
 
     }
+    private void navigateTo(BDLocation location){
+        if (isFirstLocation){
+            LatLng ll = new LatLng(location.getLatitude(),location.getLongitude());
+            MapStatusUpdate update = MapStatusUpdateFactory.newLatLng(ll);
+            baiduMap.animateMapStatus(update);
+            update = MapStatusUpdateFactory.zoomTo(16f);
+            baiduMap.animateMapStatus(update);
+            isFirstLocation=false;
+        }
+        MyLocationData.Builder locationBuilder = new MyLocationData.Builder();
+        locationBuilder.latitude(location.getLatitude());
+        locationBuilder.longitude(location.getLongitude());
+        MyLocationData locationData = locationBuilder.build();
+        baiduMap.setMyLocationData(locationData);
+    }
+
     private void requestLocation(){
         initLocation();
         mLocationClient.start();
@@ -64,7 +89,8 @@ public class MainActivity extends AppCompatActivity {
         LocationClientOption option = new LocationClientOption();
         option.setScanSpan(5000);
         option.setIsNeedAddress(true);
-        option.setLocationMode(LocationClientOption.LocationMode.Device_Sensors);
+        option.setCoorType("bd09ll");
+//        option.setLocationMode(LocationClientOption.LocationMode.Device_Sensors);
         mLocationClient.setLocOption(option);
     }
 
@@ -73,6 +99,7 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
         mLocationClient.stop();
         mapView.onDestroy();
+        baiduMap.setMyLocationEnabled(false);
     }
 
     @Override
@@ -111,6 +138,9 @@ public class MainActivity extends AppCompatActivity {
     public class MyLocationListener extends BDAbstractLocationListener {
         @Override
         public void onReceiveLocation(final BDLocation location) {
+            if (location.getLocType()== BDLocation.TypeGpsLocation ||location.getLocType()== BDLocation.TypeNetWorkLocation){
+                navigateTo(location);
+            }
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
@@ -122,14 +152,6 @@ public class MainActivity extends AppCompatActivity {
                     currentPosition.append("市：").append(location.getCity()).append(location.getCityCode()).append("--\n");
                     currentPosition.append("区：").append(location.getDistrict()).append("\n");
                     currentPosition.append("街道：").append(location.getStreet()).append(location.getStreetNumber()).append("--\n");
-
-
-
-
-
-
-
-
                     currentPosition.append("定位方式：");
                     if (location.getLocType() == BDLocation.TypeGpsLocation){
                         currentPosition.append("GPS");
@@ -137,11 +159,8 @@ public class MainActivity extends AppCompatActivity {
                         currentPosition.append("网络");
                     }
                     positionText.setText(currentPosition);
-
                 }
             });
         }
-
-
     }
 }
